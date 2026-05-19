@@ -1,0 +1,79 @@
+---
+title: "HW6 R Functions"
+author: "Joshua Chun (A17812847)"
+output: html_document
+date: "2026-04-17"
+---
+
+## Q1
+
+The type of object returned from read.pdb() is a list object, which returns a list containing components like atom data, coordinates, etc.
+
+## Q2
+
+This function extracts a subset of the PDB structure, like selecting chain A or selecting alpha carbons only. For example, chain=”A” selects chain A, or doing elety=”CA” selects alpha carbons only.
+
+## Q3
+
+The parameter sse = NULL will turn off the rectangles in the plots. They represent the secondary structure elements like the alpha helices and the beta sheets.
+
+## Q4
+
+An overlay plot (single combined line plot) would be a better plot to compare proteins. We could plot all the B-factors and use different colors for a direct comparison across proteins.
+
+## Q5
+
+The proteins s2 and s3 are the most similar because they cluster together at the lowest height in the dendrogram. This indicates they have the smallest distance between their B-factor profiles. Similarity is shown using a distance matrix (dist) followed by hierarchical clustering (hclust), where lower linkage height shows greater similarity.
+
+## Q6
+
+```{r}
+library(bio3d)
+```
+
+```{r}
+s1 <- read.pdb("4AKE")
+s2 <- read.pdb("1AKE")
+s3 <- read.pdb("1E4Y")
+
+s1.chainA <- trim.pdb(s1, chain = "A", elety = "CA")
+s2.chainA <- trim.pdb(s2, chain = "A", elety = "CA")
+s3.chainA <- trim.pdb(s3, chain = "A", elety = "CA")
+
+s1.b <- s1.chainA$atom$b
+s2.b <- s2.chainA$atom$b
+s3.b <- s3.chainA$atom$b
+```
+
+```{r}
+hc <- hclust(dist(rbind(s1.b, s2.b, s3.b)))
+plot(hc)
+```
+
+
+```{r}
+analyze_protein <- function(pdb_id) {
+  pdb <- read.pdb(pdb_id)
+  protein <- trim.pdb(pdb, chain = "A", elety = "CA")
+  b <- protein$atom$b
+  
+# Input:
+# pdb_id = a PDB ID such as "4AKE"
+  
+# What this function does: 
+# This function reads a protein PDB structure, selects chain A CA atoms, extracts the B-factors, and makes a B-factor plot.
+
+# Output:
+# Returns a vector of B-factor values and displays a plot.
+  
+  plotb3(b, sse = protein, typ = "l", ylab = "Bfactor",
+         main = paste("B-factor plot for", pdb_id))
+  
+  return(b)
+}
+```
+
+```{r}
+analyze_protein("4AKE")
+```
+
