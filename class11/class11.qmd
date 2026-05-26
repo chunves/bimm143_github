@@ -1,0 +1,230 @@
+---
+title: "class11"
+author: "Joshua Chun (A17812847)"
+format: pdf
+toc: true
+---
+
+```{r}
+# install.packages("bio3d")
+# install.packages("pheatmap")
+# install.packages("jsonlite")
+
+library(bio3d)
+library(pheatmap)
+library(jsonlite)
+```
+
+```{r}
+results_dir <- "hivpr_dimer/"
+```
+
+```{r}
+# Find all PDB model files in the results folder
+pdb_files <- list.files(path = results_dir,
+                        pattern = "*.pdb",
+                        full.names = TRUE)
+
+# Print the PDB file names
+basename(pdb_files)
+```
+
+```{r}
+# Align and superpose all AlphaFold models
+pdbs <- pdbaln(pdb_files,
+               fit = TRUE,
+               exefile = "msa")
+
+# Print alignment summary
+pdbs
+```
+
+```{r}
+# Calculating pairwise RMSD between all models
+rd <- rmsd(pdbs, fit = TRUE)
+
+# Printing RMSD range
+range(rd)
+```
+
+```{r}
+# Rows and columns for  labels
+colnames(rd) <- paste0("m", 1:5)
+rownames(rd) <- paste0("m", 1:5)
+
+# Drawing RMSD heatmap
+pheatmap(rd)
+```
+The RMSD heatmap compares structural similarity between the AlphaFold models. Lower RMSD values show more similar structures, while higher values indicate greater structural differences between models.
+
+```{r}
+# Reading experimental HIV protease structure
+pdb <- read.pdb("1hsg")
+```
+
+```{r}
+# Plotting pLDDT confidence scores for all models
+plotb3(pdbs$b[1,],
+       typ = "l",
+       lwd = 2,
+       sse = pdb)
+
+points(pdbs$b[2,], typ = "l", col = "red")
+points(pdbs$b[3,], typ = "l", col = "blue")
+points(pdbs$b[4,], typ = "l", col = "darkgreen")
+points(pdbs$b[5,], typ = "l", col = "orange")
+
+# Add divider between the two chains
+abline(v = 100, col = "gray")
+```
+The pLDDT scores represent AlphaFold confidence values for each residue position. Most regions show high confidence values, showing reliable structure predictions. Lower confidence regions  correspond to flexible or disordered regions.
+
+```{r}
+# Find rigid core positions shared across all models
+core <- core.find(pdbs)
+
+# Print core residue positions
+core.inds <- print(core, vol = 0.5)
+```
+```{r}
+# Superpose structures using only rigid core residues
+xyz <- pdbfit(pdbs,
+              core.inds,
+              outpath = "corefit_structures")
+```
+
+```{r}
+# Calculate RMSF values
+rf <- rmsf(xyz)
+
+# Plot RMSF across residue positions
+plotb3(rf,
+       sse = pdb,
+       ylab = "RMSF")
+
+# Add divider between chains
+abline(v = 100, col = "gray")
+```
+The RMSF plot shows structural variability across residue positions. Higher RMSF values indicate regions with greater conformational variation between models.
+
+```{r}
+# Find all JSON files containing PAE information
+pae_files <- list.files(path = results_dir,
+                        pattern = ".*model.*\\.json",
+                        full.names = TRUE)
+
+# Print JSON file names
+basename(pae_files)
+```
+
+```{r}
+# Read PAE information for model 1 and model 5
+pae1 <- read_json(pae_files[1],
+                  simplifyVector = TRUE)
+
+pae5 <- read_json(pae_files[5],
+                  simplifyVector = TRUE)
+
+# Show stored information
+attributes(pae1)
+```
+
+```{r}
+# Print maximum PAE scores
+pae1$max_pae
+pae5$max_pae
+```
+Low maximum PAE values indicate better confidence in the relative positioning of residues and domains. Model 1 has a lower maximum PAE value than model 5, indicating somewhat that model 1 is more reliable overall.
+
+```{r}
+# Plot PAE matrix for model 1
+plot.dmat(pae1$pae,
+          xlab = "Residue Position (i)",
+          ylab = "Residue Position (j)",
+          grid.col = "black",
+          zlim = c(0, 30))
+```
+
+```{r}
+# Plot PAE matrix for model 5
+plot.dmat(pae5$pae,
+          xlab = "Residue Position (i)",
+          ylab = "Residue Position (j)",
+          grid.col = "black",
+          zlim = c(0, 30))
+```
+
+The PAE plots visualize AlphaFold confidence in the relative positioning between residues. Lower values indicate higher confidence. Model 1 shows generally lower PAE values, showing better predicted structural reliability than model 5.
+
+```{r}
+# Find the multiple sequence alignment file
+aln_file <- list.files(path = results_dir,
+                       pattern = ".a3m$",
+                       full.names = TRUE)
+
+# Print alignment file name
+aln_file
+```
+
+```{r}
+# Read the alignment file
+aln <- read.fasta(aln_file[1],
+                  to.upper = TRUE)
+
+# Check alignment dimensions
+dim(aln$ali)
+```
+
+```{r}
+# Calculate residue conservation scores
+sim <- conserv(aln)
+```
+
+```{r}
+# Plot conservation scores for the first HIV protease chain
+plotb3(sim[1:99],
+       sse = trim.pdb(pdb, chain = "A"),
+       ylab = "Conservation Score")
+```
+
+Highly conserved residues likely play important functional or structural roles in HIV protease. Conserved regions may correspond to catalytic residues or residues important for maintaining protein stability.
+
+```{r}
+# Generate consensus sequence using a high conservation cutoff
+con <- consensus(aln,
+                 cutoff = 0.9)
+
+# Print consensus sequence
+con$seq
+```
+
+The consensus sequence highlights highly conserved residues across the alignment. Strongly conserved positions are pretty functionally important.
+
+```{r}
+# Read the top-ranked AlphaFold model
+m1.pdb <- read.pdb(pdb_files[1])
+
+# Get the number of unique residues in the PDB model
+n.res <- length(unique(m1.pdb$atom$resno))
+
+# Use only the conservation scores that match the number of residues
+sim.use <- sim[1:n.res]
+
+# Map conservation scores onto the residue numbers in the PDB
+occ <- vec2resno(sim.use, m1.pdb$atom$resno)
+
+# Write a new PDB file with conservation scores in the occupancy column
+write.pdb(m1.pdb,
+          o = occ,
+          file = "m1_conserv.pdb")
+```
+
+![HIV protease conservation structure](M1_CONSERV.PDB.png)
+HIV protease AlphaFold model colored by residue conservation scores. Highly conserved active site residues are visible in the central region of the structure.
+
+## Summary
+
+AlphaFold successfully predicted HIV protease structures with generally high confidence scores. RMSD and RMSF analyses showed structural similarities and variable regions among models. PAE analysis demonstrated that some models were more reliable than others. Conservation analysis identified highly conserved residues that are likely important for HIV protease function and catalytic activity.
+
+
+

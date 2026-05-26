@@ -180,9 +180,6 @@ b.  Very short peptides are often found in nr because the total number of possib
 Based on my Q5 results, the minimum length is likely around 8–10 amino acids, because this is where peptides begin to appear “unique”. Very short peptides of around 6–7 amino acids exist frequently within many proteins because the total sequence space (20^L) is still relatively small, so they are highly likely to match “self” proteins. If the immune system presented such short peptides, it would risk failing to distinguish self from non-self, leading to either missed infections or autoimmune reactions. As peptide length increases, the sequence space expands exponentially, making it far less likely that a foreign peptide matches anything in the host proteome. Therefore, using longer peptides improves the specificity of T-cell recognition and helps ensure a more accurate immune response.
 
 
-```{r}
-install.packages("BiocManager")
-```
 
 ```{r}
 

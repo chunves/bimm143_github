@@ -1,0 +1,335 @@
+---
+title: "Class 13: RNASeq analysis with DESeq"
+author: "Joshua Chun (PID: A17812847)"
+format: pdf
+toc: true
+---
+
+## Background
+
+Today we're going to do an RNA-seq analysis of a data set on the common glucocorticoid steroid dexamethasone (dex), and we'll use DESeq for this analysis.
+
+## Data Import
+
+Let's read the `count` data and `metadata` about this experiment setup from the supplied CSV files:
+
+```{r}
+counts <- read.csv("airway_scaledcounts.csv", row.names=1)
+metadata <- read.csv("airway_metadata.csv")
+```
+
+Have a wee peak:
+```{r}
+head(counts)
+```
+
+and the metadata that tells us what is actually in the columns of our `counts` object:
+
+```{r}
+head(metadata)
+```
+
+> Q1. How many genes are in this dataset?
+
+There are `r nrow(counts)` genes in this dataset.
+
+> Q2. How many ‘control’ cell lines do we have?
+
+```{r}
+sum(metadata$dex == "control")
+```
+
+There are 4 control cell lines.
+
+## Toy differential gene expression
+
+```{r}
+ncol(counts)
+```
+
+```{r}
+colnames(counts) == metadata$id
+```
+
+```{r}
+metadata
+```
+
+- Find the "control" columns in our `counts` object
+- Extract just the "control" column values for all genes
+- Calculate the average value per gene in these "control" columns
+
+> Q3. How would you make the above code in either approach more robust? Is there a function that could help here?
+
+```{r}
+control.inds <- metadata$dex == "control"
+control.counts <- counts[ , control.inds]
+control.mean <- rowMeans(control.counts)
+```
+
+Using `rowMeans()` makes the code more robust because it automatically calculates the average across however many control samples are selected, instead of manually dividing by 4. This avoids errors if the number of samples changes.
+
+> Q4. Follow the same procedure for the treated samples (i.e. calculate the mean per gene across drug treated samples and assign to a labeled vector called treated.mean)
+
+Now do the same for the "treated" columns. Then make a plot of `control.mean` vs `treated.mean`.
+
+```{r}
+treated.mean <- rowMeans(counts[, metadata$dex == "treated"])
+```
+
+For book-keeping let's store these together as a new object called `meancounts`
+
+```{r}
+meancounts <- data.frame(control.mean, treated.mean)
+head(meancounts)
+```
+
+> Q5 (a). Create a scatter plot showing the mean of the treated samples against the mean of the control samples.
+
+```{r}
+plot(meancounts)
+```
+
+> Q5 (b).You could also use the ggplot2 package to make this figure producing the plot below. What geom_?() function would you use for this plot?
+
+```{r}
+library(ggplot2)
+ggplot(meancounts, aes(control.mean, treated.mean)) +
+  geom_point()
+```
+
+> Q6. Try plotting both axes on a log scale. What is the argument to plot() that allows you to do this?
+
+Our count data is highly skewed and when we see a pattern like this plot it SCREAMS log transform me!
+
+```{r}
+plot(meancounts, log = "xy")
+```
+
+We most often use log2 transform for this kind of data in bioinformatics because it makes my brain hurt less.
+
+```{r}
+# Treated / Control
+
+log2(20/20)
+log2(40/20)
+log2(10/20)
+log2(80/20)
+```
+We call this little fraction the **"log2 fold change"** as it tells us how much more or less gene expression we have in units of doubling, etc.
+
+Let's calculate the log2 fold change for our `treated.mean` and `control.mean` counts and call this `log2fc`.
+
+```{r}
+meancounts$log2fc <- log2( meancounts$treated.mean / meancounts$control.mean )
+head(meancounts)
+```
+
+```{r}
+zero.vals <- which(meancounts[,1:2]==0, arr.ind=TRUE)
+
+to.rm <- unique(zero.vals[,1])
+mycounts <- meancounts[-to.rm,]
+head(mycounts)
+```
+
+> Q7. What is the purpose of the arr.ind argument in the which() function call above? Why would we then take the first column of the output and need to call the unique() function?
+
+The arr.ind=TRUE argument will return both the row and column indices (i.e. positions) where there are TRUE values. This will tell us which genes (rows) and samples (columns) have zero counts. We are going to ignore any genes that have zero counts in any sample so we just focus on the row answer. Calling unique() will ensure we don’t count any row twice if it has zero entries in both samples.
+
+A common "rule of thumb" threshold for calling a gene "up regulated" or "down regulated" is a log2 fold-change value of +2 or -2 (or greater).
+
+```{r}
+up.ind <- mycounts$log2fc > 2
+down.ind <- mycounts$log2fc < (-2)
+```
+
+> Q8. Using the up.ind vector above can you determine how many up regulated genes we have at the greater than 2 fc level?
+
+```{r}
+sum(up.ind == TRUE)
+```
+
+There are `r sum(up.ind == TRUE)` up regulated genes we have at the greater than 2 fc level.
+
+> Q9. Using the down.ind vector above can you determine how many down regulated genes we have at the greater than 2 fc level?
+
+```{r}
+sum(down.ind == TRUE)
+```
+
+There are `r sum(down.ind == TRUE)` down regulated genes at the less than -2 log2 fold-change level.
+
+> Q10. Do you trust these results? Why or why not?
+
+These results are not trustworthy. Fold change can be large without being statistically significant (e.g. based on p-values). Nothing was done yet to determine whether the differences we are seeing are significant, so these current results are likely to be very misleading.
+
+## DESeq analysis
+
+Let's do this analysis properly and not forget about the significance of the differences.
+
+For this we will use the **DESeq2** package.
+
+```{r, message=FALSE}
+library(DESeq2)
+```
+
+To run a DESeq analysis we need at least two inputs:
+
+- `countData` i.e. are gene counts across different experiments
+- `colData` i.e. our metadata about those count columns
+
+```{r, warning=FALSE}
+dds <- DESeqDataSetFromMatrix(countData = counts,
+                              colData = metadata,
+                              design = ~dex)
+```
+
+Now we can run the DESeq analysis pipeline using the `dds` object that has all the inputs we need.
+
+```{r}
+dds <- DESeq(dds)
+res <- results(dds)
+head(res)
+```
+
+## Volcano plot
+
+This is a ubiquitous and common visualization for this type of data that puts the log2 foldchange and the adjusted p-value together in one plot that people can get insight for what is going on in the whole dataset.
+
+```{r}
+ggplot(as.data.frame(res)) +
+  aes(log2FoldChange, padj) +
+  geom_point(alpha = 0.3)
+```
+
+That plot is not very useful because we don't care about genes with high p-values, we want the very low values below our alpha threshold (e.g. 0.01).
+
+Let's log the y=aixs so we can see these genes/points more clearly
+
+```{r}
+ggplot(as.data.frame(res)) +
+  aes(log2FoldChange, log(padj)) +
+  geom_point(alpha = 0.3)
+```
+
+We need to flip the y-axis so our "volcano" is not upside down.
+
+```{r}
+ggplot(as.data.frame(res)) +
+  aes(log2FoldChange, -log(padj)) +
+  geom_point(alpha = 0.3)
+```
+
+> Q11. Run the mapIds() function two more times to add the Entrez ID and UniProt accession and GENENAME as new columns called res$entrez, res$uniprot and res$genename.
+
+```{r}
+# Load annotation packages
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+
+# Add gene symbols
+res$symbol <- mapIds(
+  org.Hs.eg.db,
+  keys = row.names(res),
+  keytype = "ENSEMBL",
+  column = "SYMBOL",
+  multiVals = "first"
+)
+
+# Add Entrez gene IDs
+res$entrez <- mapIds(
+  org.Hs.eg.db,
+  keys = row.names(res),
+  column = "ENTREZID",
+  keytype = "ENSEMBL",
+  multiVals = "first"
+)
+
+# Add UniProt accession IDs
+res$uniprot <- mapIds(
+  org.Hs.eg.db,
+  keys = row.names(res),
+  column = "UNIPROT",
+  keytype = "ENSEMBL",
+  multiVals = "first"
+)
+
+# Add full gene names
+res$genename <- mapIds(
+  org.Hs.eg.db,
+  keys = row.names(res),
+  column = "GENENAME",
+  keytype = "ENSEMBL",
+  multiVals = "first"
+)
+
+# View results
+head(res)
+```
+
+```{r}
+# Order by adjusted p-value
+ord <- order(res$padj)
+
+# View top genes
+head(res[ord,])
+
+# Save annotated results
+write.csv(res[ord,], "deseq_results.csv")
+```
+
+> Q12. Can you do the same procedure as above to plot the pathview figures for the top 2 down-reguled pathways?
+
+```{r}
+# Load pathway analysis packages
+library(pathview)
+library(gage)
+library(gageData)
+
+# Load human KEGG pathway gene sets
+data(kegg.sets.hs)
+
+# Make fold-change vector
+foldchanges <- res$log2FoldChange
+
+# Name fold-change values with Entrez IDs
+names(foldchanges) <- res$entrez
+
+# Run KEGG pathway analysis
+keggres <- gage(
+  foldchanges,
+  gsets = kegg.sets.hs
+)
+
+# Look at top downregulated pathways
+head(keggres$less, 3)
+```
+
+```{r}
+# Get top 2 downregulated pathway names
+down.pathways <- rownames(keggres$less)[1:2]
+
+# Extract KEGG pathway IDs
+down.ids <- substr(
+  down.pathways,
+  start = 1,
+  stop = 8
+)
+
+# Check pathway IDs
+down.ids
+
+# Plot KEGG pathview figures for the top 2 downregulated pathways
+pathview(
+  gene.data = foldchanges,
+  pathway.id = down.ids,
+  species = "hsa"
+)
+```
+```{r}
+sessionInfo()
+```
+  
+
+
