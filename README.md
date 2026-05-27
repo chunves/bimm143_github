@@ -31,10 +31,8 @@ Class 14: [RNA-Seq analysis mini-project](class14/class14.html)
 Class 15: [Hands-on with Git and GitHub](https://github.com/chunves/bimm143_github)
 
 Class 16: [Essential UNIX for bioinformatics](class16/class16.pdf)
- 
-Class 17: [Analyzing sequencing data in the cloud](class17/class17.html)
 
 Class 18: [Mini Project: Investigating Pertussis Resurgence](class18/class18.html)
 
-Class 19: [Mini Project: Cancer Mutation Analysis](class19/class19.html)
+Class 19: [Mini Project: Cancer Mutation Analysis](class19/class19.pdf)
  
