@@ -14,13 +14,13 @@ Today we are taking a detor to analyze a fun dataset (that we have more intrinsi
 The data is all related to halloween candy and is from the 538 website.
 
 ```{r}
-# Store the file name as a variable
-candy_file <- "candy-data.txt"
+candy_file <- "candy-data.csv"
 candy <- read.csv(candy_file, row.names = 1)
-
-# View the first few rows of the dataset
 head(candy)
 ```
+
+
+
 
 ```{r}
 # install.packages("ggplot2")
