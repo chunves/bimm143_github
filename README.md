@@ -28,9 +28,9 @@ Class 13: [Transcriptomics and the analysis of RNA-Seq data](class13/class13.htm
 
 Class 14: [RNA-Seq analysis mini-project](class14/class14.html)
 
-Class 15: [Hands-on with Git and GitHub](class15/class15.html)
+Class 15: [Hands-on with Git and GitHub](https://github.com/chunves/bimm143_github)
 
-Class 16: [Essential UNIX for bioinformatics](class16/class16.html)
+Class 16: [Essential UNIX for bioinformatics](class16/class16.pdf)
  
 Class 17: [Analyzing sequencing data in the cloud](class17/class17.html)
 
