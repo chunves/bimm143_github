@@ -20,14 +20,11 @@ results_dir <- "hivpr_dimer/"
 ```
 
 ```{r}
-# Find all PDB model files in the results folder
-pdb_files <- list.files(path = results_dir,
-                        pattern = "*.pdb",
-                        full.names = TRUE)
-
-# Print the PDB file names
+results_dir <- "hivpr_dimer"
+pdb_files <- list.files(path=results_dir, pattern="\\.pdb$", full.names=TRUE)
 basename(pdb_files)
 ```
+
 
 ```{r}
 # Align and superpose all AlphaFold models
@@ -49,8 +46,8 @@ range(rd)
 
 ```{r}
 # Rows and columns for  labels
-colnames(rd) <- paste0("m", 1:5)
-rownames(rd) <- paste0("m", 1:5)
+colnames(rd) <- paste0("m", seq_len(ncol(rd)))
+rownames(rd) <- paste0("m", seq_len(nrow(rd)))
 
 # Drawing RMSD heatmap
 pheatmap(rd)
