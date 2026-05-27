@@ -1,0 +1,557 @@
+---
+title: "class18"
+author: "Joshua Chun (A17812847)"
+format: pdf
+toc: true
+---
+
+```{r}
+library(tidyverse)
+library(jsonlite)
+library(lubridate)
+```
+
+```{r}
+library(datapasta)
+```
+
+
+> Q1. With the help of the R “addin” package datapasta assign the CDC pertussis case number data to a data frame called cdc and use ggplot to make a plot of cases numbers over time.
+
+```{r}
+# Dataframe was not working properly, so imported data using read.csv
+cdc <- read.csv("U.S. Reported Pertussis Cases_ 1922 - 2025.csv")
+```
+
+```{r}
+# Rename the columns to make them easier to work with
+colnames(cdc) <- c("year", "cases", "status")
+
+cdc$cases <- as.numeric(gsub(",", "", cdc$cases))
+cdc$year <- as.numeric(cdc$year)
+```
+
+
+```{r}
+# Plot pertussis cases over time
+# x-axis = year
+# y-axis = number of reported pertussis cases
+
+ggplot(cdc) +
+  aes(x = year, y = cases, group = 1) +
+  geom_line(color = "blue") +
+  geom_point(size = 1) +
+  labs(
+    title = "U.S. Pertussis Cases Over Time",
+    x = "Year",
+    y = "Reported Cases"
+  ) +
+  theme_bw()
+```
+
+> Q2. Using the ggplot geom_vline() function add lines to your previous plot for the 1946 introduction of the wP vaccine and the 1996 switch to aP vaccine (see example in the hint below). What do you notice?
+
+```{r}
+ggplot(cdc) +
+  aes(year, cases) +
+  geom_point() +
+  geom_line() +
+
+  # wP vaccine introduced
+  geom_vline(xintercept = 1946,
+             color = "blue",
+             linetype = "dashed") +
+
+  # switch to aP vaccine
+  geom_vline(xintercept = 1996,
+             color = "red",
+             linetype = "dashed") +
+
+  labs(
+    title = "U.S. Pertussis Cases Over Time",
+    x = "Year",
+    y = "Reported Cases"
+  ) +
+  theme_bw()
+```
+
+The command geom_vline() draws a vertical line at year 1946, as well as 1996.
+
+> Q3. Describe what happened after the introduction of the aP vaccine? Do you have a possible explanation for the observed trend?
+
+After the introduction of the aP vaccine in 1996, pertussis cases began increasing again over time. One possible explanation is that immunity from the aP vaccine wanes faster than immunity from the older wP vaccine. Other possible explanations include increased vaccine hesitancy, improved PCR-based detection methods, and bacterial evolution leading to escape from vaccine-induced immunity.
+
+```{r}
+# Load the jsonlite package
+library(jsonlite)
+```
+
+```{r}
+# Read the subject table from the CMI-PB API
+subject <- read_json(
+  "https://www.cmi-pb.org/api/subject",
+  simplifyVector = TRUE
+)
+```
+
+```{r}
+# View the first 3 rows of the subject dataframe
+head(subject, 3)
+```
+
+> Q4. How many aP and wP infancy vaccinated subjects are in the dataset?
+
+```{r}
+# Count how many subjects received aP vs wP vaccines
+table(subject$infancy_vac)
+```
+
+There are 87 who recieved the aP vaccine and 85 who received the wP vaccine.
+
+> Q5. How many Male and Female subjects/patients are in the dataset?
+
+```{r}
+# Count how many Male and Female subjects are present
+table(subject$biological_sex)
+```
+
+There are 112 female subjects and 60 male subjects present.
+
+> Q6. What is the breakdown of race and biological sex (e.g. number of Asian females, White males etc…)?
+
+```{r}
+# Create a table showing race breakdown by biological sex
+table(subject$biological_sex,
+      subject$race)
+```
+
+> Q7. Using this approach determine (i) the average age of wP individuals, (ii) the average age of aP individuals; and (iii) are they significantly different?
+
+```{r}
+# Load lubridate package for working with dates
+library(lubridate)
+
+# Use today's date and subtract year_of_birth
+# to calculate each subject's age in days
+subject$age <- today() - ymd(subject$year_of_birth)
+
+# Load dplyr package for filtering and data manipulation
+library(dplyr)
+
+# Create a dataframe containing only aP vaccinated individuals
+ap <- subject %>%
+  filter(infancy_vac == "aP")
+```
+
+```{r}
+# Display summary statistics for aP ages in years
+# round() makes the output cleaner
+round(
+  summary(
+    time_length(ap$age, "years")
+  )
+)
+```
+
+```{r}
+# Create dataframe containing only wP vaccinated individuals
+wp <- subject %>%
+  filter(infancy_vac == "wP")
+```
+
+```{r}
+# Display summary statistics for wP ages in years
+round(
+  summary(
+    time_length(wp$age, "years")
+  )
+)
+```
+
+```{r}
+# Perform t-test to determine whether
+# aP and wP ages are significantly different
+x <- t.test(
+  time_length(wp$age, "years"),
+  time_length(ap$age, "years")
+)
+
+# Print p-value
+x$p.value
+```
+
+> Q8. Determine the age of all individuals at time of boost?
+
+```{r}
+# Calculate age at time of booster vaccination by subtracting year_of_birth from date_of_boost
+int <- ymd(subject$date_of_boost) -
+       ymd(subject$year_of_birth)
+
+# Convert age from days into years
+age_at_boost <- time_length(int, "year")
+
+# View first few calculated ages
+head(age_at_boost)
+```
+
+> Q9. With the help of a faceted boxplot or histogram (see below), do you think these two groups are significantly different?
+
+```{r}
+# Create histogram comparing ages of aP vs wP groups
+ggplot(subject) +
+  
+  # x-axis = age in years
+  # fill color = vaccine type
+  aes(time_length(age, "year"),
+      fill = as.factor(infancy_vac)) +
+  
+  # Create histogram
+  geom_histogram(show.legend = FALSE) +
+  
+  # Separate panels for aP and wP groups
+  facet_wrap(vars(infancy_vac), nrow = 2) +
+  
+  # Label x-axis
+  xlab("Age in years") +
+  
+  # Use clean theme
+  theme_bw()
+```
+
+The age distributions between aP and wP groups appear clearly different. The t-test p-value is extremely small, indicating a statistically significant difference between the two groups.
+
+```{r}
+# Read the specimen table from the CMI-PB API
+# This table contains information about each specimen/sample
+specimen <- read_json(
+  "https://www.cmi-pb.org/api/specimen",
+  simplifyVector = TRUE
+)
+```
+
+```{r}
+# Read the antibody titer table from the current CMI-PB API
+# The old endpoint "ab_titer" gives a 404 error, so we use "plasma_ab_titer"
+titer <- read_json(
+  "https://www.cmi-pb.org/api/plasma_ab_titer",
+  simplifyVector = TRUE
+)
+```
+
+> Q9. Complete the code to join specimen and subject tables to make a new merged data frame containing all specimen records along with their associated subject details:
+
+```{r}
+# Join specimen with subject information
+# inner_join keeps only rows that match in both tables
+meta <- inner_join(specimen, subject)
+
+# Check dimensions of merged dataframe
+dim(meta)
+
+# View first few rows
+head(meta)
+```
+
+> Q10. Now using the same procedure join meta with titer data so we can further analyze this data in terms of time of visit aP/wP, male/female etc.
+
+```{r}
+# Join antibody titer data with metadata, this connects antibody measurements to subject info
+abdata <- inner_join(titer, meta)
+
+# Check dimensions of final merged dataframe
+dim(abdata)
+```
+
+> Q11. How many specimens (i.e. entries in abdata) do we have for each isotype?
+
+```{r}
+# Count how many entries there are for each antibody isotype
+table(abdata$isotype)
+```
+
+> Q12. What are the different $dataset values in abdata and what do you notice about the number of rows for the most “recent” dataset?
+
+```{r}
+# Count how many rows belong to each dataset
+table(abdata$dataset)
+```
+
+The dataset column shows which study dataset each row came from. The most recent dataset has fewer rows, likely because newer data collection is less complete or includes fewer samples so far.
+
+> Q13. Complete the following code to make a summary boxplot of Ab titer levels (MFI) for all antigens:
+
+```{r}
+# Filter the abdata dataframe to include only IgG antibody data
+igg <- abdata %>%
+  filter(isotype == "IgG")
+```
+
+```{r}
+# View first few rows of IgG-only dataframe
+head(igg)
+```
+
+```{r}
+# Create boxplots of normalized antibody titers
+# for all antigens across different visits
+ggplot(igg) +
+  
+  # x-axis = normalized MFI values
+  # y-axis = antigen names
+  aes(MFI_normalised, antigen) +
+  
+  # Create boxplots
+  geom_boxplot() +
+  
+  # Limit x-axis for easier viewing
+  xlim(0,75) +
+  
+  # Separate plots by visit number
+  facet_wrap(vars(visit), nrow = 2) +
+  
+  # Use clean plotting theme
+  theme_bw()
+```
+
+> Q14. What antigens show differences in the level of IgG antibody titers recognizing them over time? Why these and not others?
+
+Antigens such as PT, FHA, and PRN show clear increases in IgG antibody titers over time after boosting. These antigens are components of pertussis vaccines, so the immune system recognizes and responds strongly to them. Control antigens that are not part of the vaccine show much smaller changes over time.
+
+```{r}
+# Create boxplots separated by vaccine type (aP vs wP)
+# to compare antibody responses between groups
+ggplot(igg) +
+  
+  # Color boxplots by infancy vaccine type
+  aes(MFI_normalised,
+      antigen,
+      col = infancy_vac) +
+  
+  # Create boxplots
+  geom_boxplot(show.legend = FALSE) +
+  
+  # Separate by visit number
+  facet_wrap(vars(visit), nrow = 2) +
+  
+  # Limit x-axis range
+  xlim(0,75) +
+  
+  # Clean theme
+  theme_bw()
+```
+
+```{r}
+# Alternative faceted plot
+# Separates plots by both vaccine type and visit
+igg %>%
+  filter(visit != 8) %>%
+  
+  ggplot() +
+  
+  aes(MFI_normalised,
+      antigen,
+      col = infancy_vac) +
+  
+  geom_boxplot(show.legend = FALSE) +
+  
+  xlim(0,75) +
+  
+  facet_wrap(vars(infancy_vac, visit),
+             nrow = 2) +
+  
+  theme_bw()
+```
+
+> Q15. Filter to pull out only two specific antigens for analysis and create a boxplot for each. You can chose any you like. Below I picked a “control” antigen (“OVA”, that is not in our vaccines) and a clear antigen of interest (“PT”, Pertussis Toxin, one of the key virulence factors produced by the bacterium B. pertussis).
+
+```{r}
+# Plot OVA antigen responses
+# OVA acts as a control antigen
+filter(igg, antigen == "OVA") %>%
+  
+  ggplot() +
+  
+  aes(MFI_normalised,
+      col = infancy_vac) +
+  
+  geom_boxplot(show.legend = FALSE) +
+  
+  facet_wrap(vars(visit)) +
+  
+  theme_bw()
+```
+
+```{r}
+# Plot FIM2/3 antigen responses
+filter(igg, antigen == "FIM2/3") %>%
+  
+  ggplot() +
+  
+  aes(MFI_normalised,
+      col = infancy_vac) +
+  
+  geom_boxplot(show.legend = FALSE) +
+  
+  facet_wrap(vars(visit)) +
+  
+  theme_bw()
+```
+
+> Q16. What do you notice about these two antigens time courses and the PT data in particular?
+
+PT and FIM2/3 antibody levels increase after boosting, peak around visit 5, and then decline over time. OVA levels remain relatively low because OVA is not part of the pertussis vaccine and acts as a control antigen.
+
+> Q17. Do you see any clear difference in aP vs. wP responses?
+
+There do not appear to be dramatic differences between aP and wP responses overall, although some antigens may show subtle differences in antibody magnitude or variability.
+
+```{r}
+# Filter for only the 2021 dataset
+abdata.21 <- abdata %>%
+  filter(dataset == "2021_dataset")
+```
+
+```{r}
+# Plot PT IgG antibody levels over time for 2021 dataset
+abdata.21 %>%
+  
+  filter(isotype == "IgG",
+         antigen == "PT") %>%
+  
+  ggplot() +
+  
+  aes(
+    x = planned_day_relative_to_boost,
+    y = MFI_normalised,
+    col = infancy_vac,
+    group = subject_id
+  ) +
+  
+  # Add points for each measurement
+  geom_point() +
+  
+  # Connect points for each subject
+  geom_line() +
+  
+  # Add dashed vertical line for day 0
+  geom_vline(xintercept = 0,
+             linetype = "dashed") +
+  
+  # Add dashed vertical line for day 14
+  geom_vline(xintercept = 14,
+             linetype = "dashed") +
+  
+  labs(
+    title = "2021 dataset IgG PT",
+    subtitle = "Dashed lines indicate day 0 and day 14"
+  ) +
+  
+  theme_bw()
+```
+
+> Q18. Does this trend look similar for the 2020 dataset?
+
+ The 2020 dataset shows a similar overall trend, where PT antibody levels increase after boosting, peak around two weeks, and then gradually decline.
+
+> Q19. Make a plot of the time course of gene expression for IGHG1 gene (i.e. a plot of visit vs. tpm).
+
+```{r}
+# Create URL for RNA-seq API query
+# This specific gene ID corresponds to IGHG1
+url <- "https://www.cmi-pb.org/api/v2/rnaseq?versioned_ensembl_gene_id=eq.ENSG00000211896.7"
+```
+
+```{r}
+# Read RNA-seq data from the API
+# simplifyVector = TRUE converts JSON into dataframe format
+rna <- read_json(
+  url,
+  simplifyVector = TRUE
+)
+```
+
+```{r}
+# Join RNA-seq data with metadata table
+# This connects gene expression values with subject information
+ssrna <- inner_join(rna, meta)
+```
+
+```{r}
+# View first few rows of merged RNA dataset
+head(ssrna)
+```
+
+```{r}
+# Plot time course of IGHG1 gene expression
+ggplot(ssrna) +
+  
+  # x-axis = visit number
+  # y-axis = TPM gene expression
+  # group by subject so each person's measurements connect
+  aes(visit,
+      tpm,
+      group = subject_id) +
+  
+  # Add points for each observation
+  geom_point() +
+  
+  # Connect points with lines
+  geom_line(alpha = 0.2) +
+  
+  # Clean plotting theme
+  theme_bw()
+```
+
+> Q20.: What do you notice about the expression of this gene (i.e. when is it at it’s maximum level)?
+
+IGHG1 gene expression appears to increase after boosting and reaches its highest levels around the middle visits before decreasing again at later visits.
+
+> Q21. Does this pattern in time match the trend of antibody titer data? If not, why not?
+
+The RNA expression pattern does not perfectly match antibody titer levels because RNA expression occurs earlier than production and accumulation of antibodies. Antibodies are proteins that can remain in circulation for longer periods after gene expression decreases.
+
+```{r}
+# Create boxplots comparing RNA expression
+# between aP and wP groups across visits
+ggplot(ssrna) +
+  
+  # x-axis = TPM expression
+  # color = vaccine type
+  aes(tpm,
+      col = infancy_vac) +
+  
+  # Create boxplots
+  geom_boxplot() +
+  
+  # Separate plots by visit
+  facet_wrap(vars(visit)) +
+  
+  # Use clean theme
+  theme_bw()
+```
+
+```{r}
+# Focus only on visit 4
+# Compare TPM density distributions between vaccine groups
+ssrna %>%
+  
+  filter(visit == 4) %>%
+  
+  ggplot() +
+  
+  aes(tpm,
+      col = infancy_vac) +
+  
+  # Density curves
+  geom_density() +
+  
+  # Add rug plot showing individual observations
+  geom_rug() +
+  
+  # Clean theme
+  theme_bw()
+```
+
+There does not appear to be a major difference in IGHG1 expression between aP and wP groups, even when focusing on a specific visit.
+
+
